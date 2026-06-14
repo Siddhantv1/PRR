@@ -502,7 +502,6 @@ cd frontend && npm run lint && npm run build
 
 ## Security Notes
 
-- Do not commit `.env`.
 - GitHub and Google Gemini tokens are loaded from environment variables.
 - Tool file access is constrained to the cloned repository path.
 - The Contributor Agent is instructed to make changes only through the ToolServer.
