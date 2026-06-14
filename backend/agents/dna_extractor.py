@@ -6,6 +6,15 @@ from backend.agents.json_utils import parse_json_response
 
 
 class DNAExtractor(AgentBase):
+    ALLOWED_TOOLS = {
+        "file_exists",
+        "get_pr_diff",
+        "list_files",
+        "read_file",
+        "search_code",
+        "search_prs",
+    }
+
     SYSTEM_PROMPT = """
 You are a repository archaeologist. Your job is to build a Project Constitution — a structured JSON document that captures the coding conventions of this Go open-source project so deeply that any generated code will be indistinguishable from code written by the core team.
 
@@ -51,7 +60,13 @@ After gathering evidence, output ONLY a valid JSON object with exactly these key
         )
 
         initial_message = f"Analyze the repository {owner}/{repo}. Build the Project Constitution."
-        raw_text, tokens = await self.run_loop(self.SYSTEM_PROMPT, initial_message)
+        raw_text, tokens = await self.run_loop(
+            self.SYSTEM_PROMPT,
+            initial_message,
+            max_iterations=10,
+            allowed_tools=self.ALLOWED_TOOLS,
+            max_tool_calls=12,
+        )
 
         constitution = parse_json_response(raw_text, "dna_extractor")
 

@@ -4,6 +4,17 @@ from backend.agents.base import AgentBase
 
 
 class ContributorAgent(AgentBase):
+    ALLOWED_TOOLS = {
+        "git_diff",
+        "git_status",
+        "list_files",
+        "read_file",
+        "run_tests",
+        "run_vet",
+        "search_code",
+        "write_file",
+    }
+
     def build_system_prompt(
         self,
         repo_name: str,
@@ -76,7 +87,13 @@ Review your current changes with git_diff, then fix each blocking issue. Run tes
         else:
             initial_message = "Begin implementing the fix. Start by reading the relevant files."
 
-        raw_text, tokens = await self.run_loop(system, initial_message)
+        raw_text, tokens = await self.run_loop(
+            system,
+            initial_message,
+            max_iterations=12,
+            allowed_tools=self.ALLOWED_TOOLS,
+            max_tool_calls=24,
+        )
 
         diff = await self.tool_server.call_tool("git_diff", {})
         diff_text = diff["content"][0]["text"]

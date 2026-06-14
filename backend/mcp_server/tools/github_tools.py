@@ -3,6 +3,9 @@ import httpx
 from backend.config import config
 
 
+MAX_GITHUB_SEARCH_SCAN = 75
+
+
 def get_issue(gh, owner: str, repo: str, number: int, include_comments: bool = True) -> dict:
     github_repo = gh.get_repo(f"{owner}/{repo}")
     issue = github_repo.get_issue(number)
@@ -30,8 +33,12 @@ def search_prs(gh, owner: str, repo: str, query: str = "", limit: int = 15) -> l
     github_repo = gh.get_repo(f"{owner}/{repo}")
     normalized_query = query.lower()
     results: list[dict] = []
+    scanned = 0
 
     for pr in github_repo.get_pulls(state="closed", sort="updated", direction="desc"):
+        scanned += 1
+        if scanned > MAX_GITHUB_SEARCH_SCAN:
+            break
         if len(results) >= limit:
             break
         if pr.merged_at is None:
@@ -104,8 +111,12 @@ def search_issues(
     github_repo = gh.get_repo(f"{owner}/{repo}")
     normalized_query = query.lower()
     results: list[dict] = []
+    scanned = 0
 
     for issue in github_repo.get_issues(state=state):
+        scanned += 1
+        if scanned > MAX_GITHUB_SEARCH_SCAN:
+            break
         if len(results) >= limit:
             break
         searchable = f"{issue.title or ''} {issue.body or ''}".lower()

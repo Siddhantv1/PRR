@@ -3,6 +3,14 @@ from backend.agents.json_utils import parse_json_response
 
 
 class IssueAnalyst(AgentBase):
+    ALLOWED_TOOLS = {
+        "get_issue",
+        "git_log",
+        "search_code",
+        "search_issues",
+        "search_prs",
+    }
+
     SYSTEM_PROMPT = """
 You are a bug triage engineer analyzing a GitHub issue to produce a precise fix plan.
 
@@ -39,7 +47,13 @@ Be conservative with affected_files — only list files you're confident need ch
         )
 
         initial_message = f"Analyze issue #{issue_number} in {owner}/{repo}. Produce the fix plan JSON."
-        raw_text, tokens = await self.run_loop(self.SYSTEM_PROMPT, initial_message)
+        raw_text, tokens = await self.run_loop(
+            self.SYSTEM_PROMPT,
+            initial_message,
+            max_iterations=10,
+            allowed_tools=self.ALLOWED_TOOLS,
+            max_tool_calls=8,
+        )
 
         analysis = parse_json_response(raw_text, "issue_analyst")
 

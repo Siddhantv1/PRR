@@ -16,6 +16,10 @@ export function RunDetail({ runId, onBack }) {
     error,
     connected,
     revisionRound,
+    maxRevisionRounds,
+    startedAt,
+    currentDescription,
+    lastActivity,
   } = useRunStream(runId)
 
   return (
@@ -34,7 +38,16 @@ export function RunDetail({ runId, onBack }) {
         </div>
       </header>
 
-      <PipelineProgress stages={stages} revisionRound={revisionRound} />
+      <PipelineProgress
+        stages={stages}
+        revisionRound={revisionRound}
+        maxRevisionRounds={maxRevisionRounds}
+        startedAt={startedAt}
+        currentDescription={currentDescription}
+        lastActivity={lastActivity}
+        hasResult={Boolean(result)}
+        hasError={Boolean(error)}
+      />
 
       {error ? <div className="error-banner">{error}</div> : null}
 

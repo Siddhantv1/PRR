@@ -28,20 +28,85 @@ logger = logging.getLogger(__name__)
 
 
 class ToolServer:
+    CACHEABLE_TOOLS = {
+        "file_exists",
+        "get_issue",
+        "get_pr_comments",
+        "get_pr_diff",
+        "git_blame",
+        "git_log",
+        "list_files",
+        "read_file",
+        "search_code",
+        "search_issues",
+        "search_prs",
+    }
+    LOCAL_CACHE_TOOLS = {
+        "file_exists",
+        "git_blame",
+        "git_log",
+        "list_files",
+        "read_file",
+        "search_code",
+    }
+
     def __init__(self, repo_path: str, owner: str, repo: str):
         self.repo_path = repo_path
         self.owner = owner
         self.repo = repo
         self.gh = Github(config.GITHUB_TOKEN)
+        self._tool_cache: dict[tuple[str, str], dict] = {}
+        self._empty_tool_calls: set[tuple[str, str]] = set()
 
     async def call_tool(self, name: str, arguments: dict) -> dict:
+        arguments = self._normalize_arguments(name, arguments or {})
+        cache_key = self._cache_key(name, arguments)
         self._log_call(name, arguments)
+
+        if name in self.CACHEABLE_TOOLS and cache_key in self._empty_tool_calls:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"EMPTY_RESULT_ALREADY_SEEN: {name} with these arguments "
+                            "already returned no useful results. Do not repeat this "
+                            "exact tool call; use the prior result, try different "
+                            "arguments, or continue with the evidence you have."
+                        ),
+                    }
+                ],
+                "cached": True,
+            }
+
+        if name in self.CACHEABLE_TOOLS and cache_key in self._tool_cache:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"DUPLICATE_TOOL_CALL: {name} with these arguments was "
+                            "already called. Reuse the earlier result from the "
+                            "conversation instead of calling it again."
+                        ),
+                    }
+                ],
+                "cached": True,
+            }
+
         try:
             tool = self._tool_routes().get(name)
             if tool is None:
                 raise ValueError(f"Unknown tool: {name}")
             result = tool(**arguments)
-            return {"content": [{"type": "text", "text": str(result)}]}
+            response = {"content": [{"type": "text", "text": str(result)}]}
+            if name in self.CACHEABLE_TOOLS:
+                self._tool_cache[cache_key] = response
+                if self._is_empty_result(result):
+                    self._empty_tool_calls.add(cache_key)
+            if name == "write_file":
+                self._clear_local_tool_cache()
+            return response
         except Exception as e:
             return {
                 "content": [{"type": "text", "text": f"ERROR: {e}"}],
@@ -232,7 +297,7 @@ class ToolServer:
             },
         ]
 
-    def get_gemini_tools(self) -> list[dict]:
+    def get_gemini_tools(self, allowed_names: set[str] | None = None) -> list[dict]:
         """
         Convert Anthropic-format tool schemas to Gemini function declarations.
         Anthropic: {"name": ..., "description": ..., "input_schema": {...}}
@@ -262,6 +327,8 @@ class ToolServer:
 
         result = []
         for tool in self.get_tool_schemas():
+            if allowed_names is not None and tool["name"] not in allowed_names:
+                continue
             declaration = {
                 "name": tool["name"],
                 "description": tool["description"],
@@ -305,3 +372,52 @@ class ToolServer:
         except TypeError:
             serialized_args = str(arguments)
         logger.info("Tool call: %s args=%s", name, serialized_args[:500])
+
+    def _normalize_arguments(self, name: str, arguments: dict) -> dict:
+        normalized = dict(arguments)
+        if name == "search_code":
+            normalized["max_results"] = min(
+                self._positive_int(normalized.get("max_results"), 20),
+                20,
+            )
+        elif name in {"search_prs", "search_issues"}:
+            normalized["limit"] = min(self._positive_int(normalized.get("limit"), 5), 5)
+        elif name == "git_log":
+            normalized["limit"] = min(self._positive_int(normalized.get("limit"), 5), 5)
+        return normalized
+
+    def _positive_int(self, value: Any, default: int) -> int:
+        if value is None:
+            return default
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return default
+        return max(1, parsed)
+
+    def _cache_key(self, name: str, arguments: dict) -> tuple[str, str]:
+        try:
+            serialized_args = json.dumps(arguments, sort_keys=True, default=str)
+        except TypeError:
+            serialized_args = str(sorted(arguments.items()))
+        return name, serialized_args
+
+    def _is_empty_result(self, result: Any) -> bool:
+        if result is None:
+            return True
+        if result == [] or result == {}:
+            return True
+        if isinstance(result, str):
+            normalized = result.strip()
+            return normalized in {"", "[]", "{}", "None", "No changes."}
+        return False
+
+    def _clear_local_tool_cache(self) -> None:
+        self._tool_cache = {
+            key: value
+            for key, value in self._tool_cache.items()
+            if key[0] not in self.LOCAL_CACHE_TOOLS
+        }
+        self._empty_tool_calls = {
+            key for key in self._empty_tool_calls if key[0] not in self.LOCAL_CACHE_TOOLS
+        }

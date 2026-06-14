@@ -216,8 +216,129 @@ p {
 }
 
 .progress-panel {
+  display: grid;
+  gap: 14px;
   padding: 14px;
   margin-bottom: 18px;
+}
+
+.progress-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progress-summary h2 {
+  margin-top: 4px;
+  color: #f4f4f5;
+  font-size: 18px;
+  line-height: 1.35;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.progress-stats {
+  min-width: 112px;
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #d4d4d8;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.progress-stats span {
+  min-width: 46px;
+  padding: 5px 8px;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  background: #0b0b0c;
+  text-align: center;
+}
+
+.progress-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #27272a;
+  border-radius: 999px;
+  background: #09090b;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 12px;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(235, 239, 3, 0.88), rgba(204, 255, 0, 0.88)),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.18) 0,
+      rgba(255, 255, 255, 0.18) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  background-size: auto, 28px 28px;
+  transition: width 0.35s ease;
+  animation: progress-stripes 1.1s linear infinite;
+}
+
+.progress-track.complete .progress-fill {
+  background: #22c55e;
+  animation: none;
+}
+
+.progress-track.error .progress-fill {
+  background: #ef4444;
+  animation: none;
+}
+
+@keyframes progress-stripes {
+  to {
+    background-position: 0 0, 28px 0;
+  }
+}
+
+.activity-strip {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  color: #d4d4d8;
+  background: #0b0b0c;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.activity-pulse {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
+  animation: activity-pulse 1.25s ease-out infinite;
+}
+
+.activity-pulse.error {
+  background: #ef4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+  animation: none;
+}
+
+@keyframes activity-pulse {
+  70% {
+    box-shadow: 0 0 0 9px rgba(56, 189, 248, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
 }
 
 .stage-row {
@@ -250,6 +371,10 @@ p {
 .stage-pill.running {
   border-color: rgba(245, 158, 11, 0.7);
   color: #fde68a;
+}
+
+.stage-pill.active {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.11);
 }
 
 .stage-pill.complete {
@@ -852,6 +977,14 @@ p {
 
   .issue-card h1 {
     font-size: 23px;
+  }
+
+  .progress-summary {
+    display: grid;
+  }
+
+  .progress-stats {
+    justify-content: flex-start;
   }
 
   .stage-row,

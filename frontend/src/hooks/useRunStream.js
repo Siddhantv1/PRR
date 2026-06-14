@@ -27,11 +27,16 @@ function initialState() {
     error: null,
     connected: false,
     revisionRound: 0,
+    maxRevisionRounds: 2,
+    startedAt: new Date().toISOString(),
+    currentStage: null,
+    currentDescription: 'Preparing run',
+    lastActivity: 'Waiting for agent...',
   }
 }
 
 function appendEvent(events, event) {
-  return [...events, { ...event, receivedAt: new Date().toISOString() }].slice(-200)
+  return [...events, event].slice(-200)
 }
 
 function markAllStages(status) {
@@ -55,17 +60,24 @@ function reducer(state, action) {
     return state
   }
 
-  const event = action.event
+  const event = { ...action.event, receivedAt: new Date().toISOString() }
   let next = state
 
   if (STREAM_EVENT_TYPES.has(event.type)) {
-    next = { ...next, streamEvents: appendEvent(next.streamEvents, event) }
+    next = {
+      ...next,
+      streamEvents: appendEvent(next.streamEvents, event),
+      lastActivity: describeActivity(event),
+    }
   }
 
   if (event.type === 'stage_start') {
     return {
       ...next,
       stages: { ...next.stages, [event.stage]: 'running' },
+      currentStage: event.stage,
+      currentDescription: event.description || formatStageName(event.stage),
+      lastActivity: event.description || describeActivity(event),
     }
   }
 
@@ -73,6 +85,7 @@ function reducer(state, action) {
     return {
       ...next,
       stages: { ...next.stages, [event.stage]: 'complete' },
+      lastActivity: `${formatStageName(event.stage)} complete`,
     }
   }
 
@@ -87,11 +100,21 @@ function reducer(state, action) {
   }
 
   if (event.type === 'revision_start') {
-    return { ...next, revisionRound: event.round }
+    return {
+      ...next,
+      revisionRound: event.round,
+      maxRevisionRounds: event.total || next.maxRevisionRounds,
+    }
   }
 
   if (event.type === 'run_complete') {
-    return { ...next, result: event, stages: markAllStages('complete') }
+    return {
+      ...next,
+      result: event,
+      stages: markAllStages('complete'),
+      currentDescription: 'Run complete',
+      lastActivity: 'Final output ready',
+    }
   }
 
   if (event.type === 'run_error') {
@@ -101,14 +124,56 @@ function reducer(state, action) {
         stages[stage] = 'error'
       }
     }
-    return { ...next, error: event.error || 'Run failed.', stages }
+    return {
+      ...next,
+      error: event.error || 'Run failed.',
+      stages,
+      currentDescription: 'Run failed',
+      lastActivity: event.error || 'Run failed.',
+    }
   }
 
   if (event.type === 'raw') {
-    return { ...next, streamEvents: appendEvent(next.streamEvents, event) }
+    return {
+      ...next,
+      streamEvents: appendEvent(next.streamEvents, event),
+      lastActivity: 'Received raw stream event',
+    }
   }
 
   return next
+}
+
+function formatStageName(stage) {
+  return String(stage || 'stage')
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function describeActivity(event) {
+  if (event.type === 'tool_call') {
+    return `Calling ${event.tool}`
+  }
+  if (event.type === 'tool_result') {
+    return `${event.tool} ${event.ok === false ? 'failed' : 'returned'}`
+  }
+  if (event.type === 'agent_text') {
+    return 'Agent produced an update'
+  }
+  if (event.type === 'review_comment') {
+    return `Maintainer comment: ${event.kind || 'COMMENT'}`
+  }
+  if (event.type === 'revision_start') {
+    return `Revision round ${event.round} of ${event.total}`
+  }
+  if (event.type === 'info' || event.type === 'stage_info') {
+    return event.message || event.text || 'Working'
+  }
+  if (event.type === 'stage_start') {
+    return event.description || formatStageName(event.stage)
+  }
+  return 'Working'
 }
 
 export function useRunStream(runId) {

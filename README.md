@@ -144,7 +144,7 @@ DB_PATH=./data/runs.db
 CONSTITUTION_CACHE_DIR=./cache/constitutions
 FRONTEND_URL=http://localhost:5173
 PORT=8000
-MAX_REVISION_ROUNDS=3
+MAX_REVISION_ROUNDS=2
 MAX_AGENT_ITERATIONS=25
 MODEL=gemini-3.1-flash-lite
 ```

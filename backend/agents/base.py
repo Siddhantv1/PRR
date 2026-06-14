@@ -96,6 +96,8 @@ class AgentBase:
         initial_message: str,
         max_iterations: int | None = None,
         extra_tools: list[dict] | None = None,
+        allowed_tools: set[str] | None = None,
+        max_tool_calls: int | None = None,
     ) -> tuple[str, int]:
         """
         Run the tool-use loop. Returns (final_text, total_tokens).
@@ -103,25 +105,42 @@ class AgentBase:
         Gemini requires alternating user/model roles. Multiple tool results from
         one model response are batched into a single user turn.
         """
-        tools = self.tool_server.get_gemini_tools()
+        tools = self._get_tool_declarations(allowed_tools)
         if extra_tools:
             tools.extend(extra_tools)
 
-        cfg = self._build_config(system_prompt, tools)
+        system_with_budget = self._with_tool_budget_rules(system_prompt)
+        tool_cfg = self._build_config(system_with_budget, tools)
+        text_only_cfg = self._build_config(system_with_budget, tools=None)
         contents = [{"role": "user", "parts": [{"text": initial_message}]}]
 
         total_tokens = 0
         iterations = 0
+        tool_calls_made = 0
+        tool_budget_exhausted = False
         max_iter = max_iterations or config.MAX_AGENT_ITERATIONS
 
         while iterations < max_iter:
             iterations += 1
 
+            cfg = text_only_cfg if tool_budget_exhausted else tool_cfg
             response = await self._generate_content_with_retries(cfg, contents)
             total_tokens += self._count_tokens(response)
 
             texts, calls = self._extract_parts(response)
             if not texts and not calls:
+                if self._is_malformed_function_call(response) and not tool_budget_exhausted:
+                    tool_budget_exhausted = True
+                    await self.broadcast(
+                        {
+                            "type": "info",
+                            "message": (
+                                "Gemini returned a malformed function call. "
+                                "Continuing without tools and asking for a final answer."
+                            ),
+                        }
+                    )
+                    continue
                 raise RuntimeError(
                     "Gemini returned empty response "
                     f"({self._response_diagnostics(response)}) -- possible SAFETY block. "
@@ -156,6 +175,7 @@ class AgentBase:
 
             function_response_parts = []
             for call in calls:
+                tool_calls_made += 1
                 args = dict(call.args) if call.args else {}
                 await self.broadcast(
                     {
@@ -193,7 +213,38 @@ class AgentBase:
 
             contents.append({"role": "user", "parts": function_response_parts})
 
+            if max_tool_calls is not None and tool_calls_made >= max_tool_calls:
+                tool_budget_exhausted = True
+                await self.broadcast(
+                    {
+                        "type": "info",
+                        "message": (
+                            f"Tool budget reached ({tool_calls_made}/{max_tool_calls}). "
+                            "Asking agent to summarize with gathered evidence."
+                        ),
+                    }
+                )
+
         raise RuntimeError(f"Agent exceeded max iterations ({max_iter})")
+
+    def _get_tool_declarations(self, allowed_tools: set[str] | None) -> list[dict]:
+        try:
+            return self.tool_server.get_gemini_tools(allowed_tools)
+        except TypeError:
+            tools = self.tool_server.get_gemini_tools()
+            if allowed_tools is None:
+                return tools
+            return [tool for tool in tools if tool["name"] in allowed_tools]
+
+    def _with_tool_budget_rules(self, system_prompt: str) -> str:
+        return f"""{system_prompt}
+
+TOOL BUDGET RULES:
+- Do not repeat the same tool call with the same arguments.
+- If a search or listing tool returns empty results, do not retry the same query.
+- Prefer one targeted query over several broad queries.
+- Once you have enough evidence to answer the stage, stop calling tools and produce the requested final output.
+"""
 
     async def run_single_call(
         self,
@@ -274,6 +325,16 @@ class AgentBase:
             f"finish_message={finish_message!r}, "
             f"part_count={part_count}, "
             f"safety_ratings={safety_ratings}"
+        )
+
+    def _is_malformed_function_call(self, response) -> bool:
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            return False
+        finish_reason = getattr(candidates[0], "finish_reason", None)
+        return (
+            finish_reason == "MALFORMED_FUNCTION_CALL"
+            or getattr(finish_reason, "name", None) == "MALFORMED_FUNCTION_CALL"
         )
 
     def _is_resource_exhausted(self, exc: Exception) -> bool:
