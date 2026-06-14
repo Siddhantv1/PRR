@@ -1,7 +1,5 @@
-import json
-import re
-
 from backend.agents.base import AgentBase
+from backend.agents.json_utils import parse_json_response
 
 
 class IssueAnalyst(AgentBase):
@@ -43,10 +41,7 @@ Be conservative with affected_files — only list files you're confident need ch
         initial_message = f"Analyze issue #{issue_number} in {owner}/{repo}. Produce the fix plan JSON."
         raw_text, tokens = await self.run_loop(self.SYSTEM_PROMPT, initial_message)
 
-        json_text = raw_text.strip()
-        if json_text.startswith("```"):
-            json_text = re.sub(r"```(?:json)?\n?", "", json_text).strip("` \n")
-        analysis = json.loads(json_text)
+        analysis = parse_json_response(raw_text, "issue_analyst")
 
         await self.broadcast(
             {

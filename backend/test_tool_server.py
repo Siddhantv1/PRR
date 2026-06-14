@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test")
+os.environ.setdefault("GOOGLE_API_KEY", "test")
 os.environ.setdefault("GITHUB_TOKEN", "test")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

@@ -232,6 +232,52 @@ class ToolServer:
             },
         ]
 
+    def get_gemini_tools(self) -> list[dict]:
+        """
+        Convert Anthropic-format tool schemas to Gemini function declarations.
+        Anthropic: {"name": ..., "description": ..., "input_schema": {...}}
+        Gemini:    {"name": ..., "description": ..., "parameters": {...}}
+        Also strips any "additionalProperties" keys — Gemini rejects them.
+        Also converts any "integer" types to "number" — Gemini's type system is a subset.
+        """
+        import re as _re
+
+        def clean_schema(schema: dict) -> dict:
+            cleaned = {}
+            for key, value in schema.items():
+                if key == "additionalProperties":
+                    continue
+                if key == "type" and value == "integer":
+                    cleaned[key] = "number"
+                elif isinstance(value, dict):
+                    cleaned[key] = clean_schema(value)
+                elif isinstance(value, list):
+                    cleaned[key] = [
+                        clean_schema(item) if isinstance(item, dict) else item
+                        for item in value
+                    ]
+                else:
+                    cleaned[key] = value
+            return cleaned
+
+        result = []
+        for tool in self.get_tool_schemas():
+            declaration = {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": clean_schema(
+                    tool.get("input_schema", {"type": "object", "properties": {}})
+                ),
+            }
+            result.append(declaration)
+        assert all(
+            _re.match(r"^[a-zA-Z_]\w*$", tool["name"]) for tool in result
+        ), "Tool name contains invalid characters for Gemini"
+        assert len({tool["name"] for tool in result}) == len(result), (
+            "Tool names must be unique for Gemini"
+        )
+        return result
+
     def _tool_routes(self) -> dict[str, Callable[..., Any]]:
         return {
             "read_file": lambda **args: read_file(self.repo_path, **args),

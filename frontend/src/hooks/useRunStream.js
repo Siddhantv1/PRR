@@ -121,12 +121,17 @@ export function useRunStream(runId) {
       return undefined
     }
 
+    let closing = false
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(`${protocol}//${window.location.host}/ws/runs/${runId}`)
 
     socket.onopen = () => dispatch({ type: 'connected', connected: true })
     socket.onclose = () => dispatch({ type: 'connected', connected: false })
-    socket.onerror = () => dispatch({ type: 'connection_error' })
+    socket.onerror = () => {
+      if (!closing) {
+        dispatch({ type: 'connection_error' })
+      }
+    }
 
     socket.onmessage = (message) => {
       try {
@@ -137,6 +142,7 @@ export function useRunStream(runId) {
     }
 
     return () => {
+      closing = true
       socket.close()
     }
   }, [runId])

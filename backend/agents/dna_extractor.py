@@ -1,8 +1,8 @@
 import json
-import re
 
 from backend import db
 from backend.agents.base import AgentBase
+from backend.agents.json_utils import parse_json_response
 
 
 class DNAExtractor(AgentBase):
@@ -53,10 +53,7 @@ After gathering evidence, output ONLY a valid JSON object with exactly these key
         initial_message = f"Analyze the repository {owner}/{repo}. Build the Project Constitution."
         raw_text, tokens = await self.run_loop(self.SYSTEM_PROMPT, initial_message)
 
-        json_text = raw_text.strip()
-        if json_text.startswith("```"):
-            json_text = re.sub(r"```(?:json)?\n?", "", json_text).strip("` \n")
-        constitution = json.loads(json_text)
+        constitution = parse_json_response(raw_text, "dna_extractor")
 
         await db.save_constitution(repo_key, constitution)
         await self.broadcast(

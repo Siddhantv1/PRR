@@ -163,5 +163,5 @@ class Orchestrator:
             return result
         except Exception as e:
             await db.update_run(self.run_id, status="failed", error=str(e))
-            await self.broadcast({"type": "run_failed", "error": str(e)})
+            await self.broadcast({"type": "run_error", "error": str(e)})
             raise

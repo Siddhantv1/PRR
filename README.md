@@ -43,7 +43,7 @@ The frontend streams the entire process live, including tool calls, tool results
 PRR/
   backend/
     agents/
-      base.py              # Shared Anthropic tool-use loop
+      base.py              # Shared Gemini function-calling loop
       dna_extractor.py     # Stage 1: Project Constitution
       issue_analyst.py     # Stage 2: issue triage and fix plan
       contributor.py       # Stage 3: code implementation
@@ -108,7 +108,7 @@ flowchart TD
 - Python **3.12** recommended
 - Node.js and npm
 - Go toolchain available on `PATH` for repositories that need `go test`, `go vet`, and `go build`
-- Anthropic API key
+- Google Gemini API key
 - GitHub token with access to the target repository
 
 Python 3.12 matters because the pinned backend dependency `pydantic==2.7.1` depends on `pydantic-core==2.18.2`, which does not build cleanly on Python 3.14 in this environment.
@@ -132,7 +132,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-api03-...
+GOOGLE_API_KEY=AIza...
 GITHUB_TOKEN=ghp_...
 ```
 
@@ -146,7 +146,7 @@ FRONTEND_URL=http://localhost:5173
 PORT=8000
 MAX_REVISION_ROUNDS=3
 MAX_AGENT_ITERATIONS=25
-MODEL=claude-sonnet-4-20250514
+MODEL=gemini-3.1-flash-lite
 ```
 
 Run the backend:
@@ -288,7 +288,7 @@ Common event types:
 | `stage_start` | Marks a pipeline stage as running |
 | `stage_complete` | Marks a stage as complete |
 | `revision_start` | Begins a contributor/maintainer revision round |
-| `tool_call` | Shows a tool invocation requested by Claude |
+| `tool_call` | Shows a tool invocation requested by Gemini |
 | `tool_result` | Shows the result of a tool invocation |
 | `agent_text` | Streams agent text output |
 | `review_comment` | Emits maintainer review comments |
@@ -370,7 +370,7 @@ Produces the final pull request title and body, using the diff, issue analysis, 
 
 ## Tool Server
 
-The `ToolServer` is the execution layer for Claude tool-use blocks.
+The `ToolServer` is the execution layer for Gemini function calls.
 
 File:
 
@@ -378,7 +378,7 @@ File:
 backend/mcp_server/server.py
 ```
 
-When Claude asks to use a tool, the agent base loop calls:
+When Gemini asks to use a tool, the agent base loop calls:
 
 ```python
 await tool_server.call_tool(name, arguments)
@@ -495,7 +495,7 @@ cd frontend && npm run lint && npm run build
 
 - The system currently generates a diff and PR description; it does not open a pull request automatically.
 - The repo is cloned into `REPOS_DIR` using a tokenized HTTPS URL.
-- Live end-to-end runs require network access to GitHub and Anthropic.
+- Live end-to-end runs require network access to GitHub and Google Gemini.
 - Target repositories must have the relevant language toolchain installed locally. For current Go workflows, `go` must be on `PATH`.
 - The maintainer review is simulated by an LLM. It is useful for pre-review, but it is not a substitute for an actual project maintainer.
 - The frontend intentionally keeps PR opening manual.
@@ -503,7 +503,7 @@ cd frontend && npm run lint && npm run build
 ## Security Notes
 
 - Do not commit `.env`.
-- GitHub and Anthropic tokens are loaded from environment variables.
+- GitHub and Google Gemini tokens are loaded from environment variables.
 - Tool file access is constrained to the cloned repository path.
 - The Contributor Agent is instructed to make changes only through the ToolServer.
 - Running against untrusted repositories still executes project tests/builds locally. Use an isolated environment for high-risk repositories.
@@ -531,5 +531,5 @@ Verified locally:
 Not yet verified end-to-end against a real GitHub issue in this workspace:
 
 - Real repository clone
-- Real Anthropic tool-use loop
+- Real Gemini function-calling loop
 - Real Go test/vet/build execution on a target project

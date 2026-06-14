@@ -1,7 +1,5 @@
-import json
-import re
-
 from backend.agents.base import AgentBase
+from backend.agents.json_utils import parse_json_response
 
 
 class OutputGenerator(AgentBase):
@@ -61,10 +59,7 @@ Changes made:
 {diff_text[:5000]}
 """
         raw, tokens = await self.run_single_call(system, user_msg)
-        json_text = raw.strip()
-        if json_text.startswith("```"):
-            json_text = re.sub(r"```(?:json)?\n?", "", json_text).strip("` \n")
-        pr = json.loads(json_text)
+        pr = parse_json_response(raw, "output_generator")
 
         result = {
             "diff": diff_text,
