@@ -28,18 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class ToolServer:
-    CACHEABLE_TOOLS = {
-        "file_exists",
-        "get_issue",
-        "get_pr_comments",
-        "get_pr_diff",
-        "git_blame",
-        "git_log",
-        "list_files",
-        "read_file",
-        "search_code",
-        "search_issues",
-        "search_prs",
+    NO_CACHE = {
+        "write_file",
+        "run_tests",
+        "run_vet",
+        "run_build",
+        "git_diff",
+        "git_status",
     }
     LOCAL_CACHE_TOOLS = {
         "file_exists",
@@ -55,55 +50,20 @@ class ToolServer:
         self.owner = owner
         self.repo = repo
         self.gh = Github(config.GITHUB_TOKEN)
-        self._tool_cache: dict[tuple[str, str], dict] = {}
-        self._empty_tool_calls: set[tuple[str, str]] = set()
+        self._cache: dict[str, dict] = {}
 
     async def call_tool(self, name: str, arguments: dict) -> dict:
         arguments = self._normalize_arguments(name, arguments or {})
         cache_key = self._cache_key(name, arguments)
         self._log_call(name, arguments)
 
-        if name in self.CACHEABLE_TOOLS and cache_key in self._empty_tool_calls:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"EMPTY_RESULT_ALREADY_SEEN: {name} with these arguments "
-                            "already returned no useful results. Do not repeat this "
-                            "exact tool call; use the prior result, try different "
-                            "arguments, or continue with the evidence you have."
-                        ),
-                    }
-                ],
-                "cached": True,
-            }
-
-        if name in self.CACHEABLE_TOOLS and cache_key in self._tool_cache:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"DUPLICATE_TOOL_CALL: {name} with these arguments was "
-                            "already called. Reuse the earlier result from the "
-                            "conversation instead of calling it again."
-                        ),
-                    }
-                ],
-                "cached": True,
-            }
+        if name not in self.NO_CACHE and cache_key in self._cache:
+            return self._cache[cache_key]
 
         try:
-            tool = self._tool_routes().get(name)
-            if tool is None:
-                raise ValueError(f"Unknown tool: {name}")
-            result = tool(**arguments)
-            response = {"content": [{"type": "text", "text": str(result)}]}
-            if name in self.CACHEABLE_TOOLS:
-                self._tool_cache[cache_key] = response
-                if self._is_empty_result(result):
-                    self._empty_tool_calls.add(cache_key)
+            response = await self._dispatch(name, arguments)
+            if name not in self.NO_CACHE:
+                self._cache[cache_key] = response
             if name == "write_file":
                 self._clear_local_tool_cache()
             return response
@@ -112,6 +72,13 @@ class ToolServer:
                 "content": [{"type": "text", "text": f"ERROR: {e}"}],
                 "isError": True,
             }
+
+    async def _dispatch(self, name: str, arguments: dict) -> dict:
+        tool = self._tool_routes().get(name)
+        if tool is None:
+            raise ValueError(f"Unknown tool: {name}")
+        result = tool(**arguments)
+        return {"content": [{"type": "text", "text": str(result)}]}
 
     def get_tool_schemas(self) -> list[dict]:
         return [
@@ -267,7 +234,7 @@ class ToolServer:
             },
             {
                 "name": "get_pr_diff",
-                "description": "Fetch a GitHub pull request diff, truncated to 20,000 characters.",
+                "description": "Fetch a GitHub pull request diff, truncated to 8,000 characters.",
                 "input_schema": {
                     "type": "object",
                     "properties": {"number": {"type": "integer"}},
@@ -380,8 +347,16 @@ class ToolServer:
                 self._positive_int(normalized.get("max_results"), 20),
                 20,
             )
-        elif name in {"search_prs", "search_issues"}:
-            normalized["limit"] = min(self._positive_int(normalized.get("limit"), 5), 5)
+        elif name == "search_prs":
+            normalized["limit"] = min(
+                self._positive_int(normalized.get("limit"), 8),
+                8,
+            )
+        elif name == "search_issues":
+            normalized["limit"] = min(
+                self._positive_int(normalized.get("limit"), 6),
+                6,
+            )
         elif name == "git_log":
             normalized["limit"] = min(self._positive_int(normalized.get("limit"), 5), 5)
         return normalized
@@ -395,29 +370,16 @@ class ToolServer:
             return default
         return max(1, parsed)
 
-    def _cache_key(self, name: str, arguments: dict) -> tuple[str, str]:
+    def _cache_key(self, name: str, arguments: dict) -> str:
         try:
             serialized_args = json.dumps(arguments, sort_keys=True, default=str)
         except TypeError:
             serialized_args = str(sorted(arguments.items()))
-        return name, serialized_args
-
-    def _is_empty_result(self, result: Any) -> bool:
-        if result is None:
-            return True
-        if result == [] or result == {}:
-            return True
-        if isinstance(result, str):
-            normalized = result.strip()
-            return normalized in {"", "[]", "{}", "None", "No changes."}
-        return False
+        return f"{name}:{serialized_args}"
 
     def _clear_local_tool_cache(self) -> None:
-        self._tool_cache = {
+        self._cache = {
             key: value
-            for key, value in self._tool_cache.items()
-            if key[0] not in self.LOCAL_CACHE_TOOLS
-        }
-        self._empty_tool_calls = {
-            key for key in self._empty_tool_calls if key[0] not in self.LOCAL_CACHE_TOOLS
+            for key, value in self._cache.items()
+            if key.split(":", 1)[0] not in self.LOCAL_CACHE_TOOLS
         }

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 
 import google.genai as genai
@@ -30,45 +31,55 @@ class AgentBase:
         tools: list[dict] | None = None,
     ) -> gtypes.GenerateContentConfig:
         """Build GenerateContentConfig with system instruction and optional tools."""
-        config_kwargs = {
-            "system_instruction": system_prompt,
-            "max_output_tokens": 8192,
-            "temperature": 0.2,
-        }
+        cfg = gtypes.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=8192,
+            temperature=0.2,
+        )
         if tools:
-            function_declarations = [
-                gtypes.FunctionDeclaration.model_validate(tool) for tool in tools
-            ]
-            if function_declarations:
-                # Gemini defaults to AUTO function calling when declarations exist.
-                # Supplying an explicit tool_config can trigger INVALID_ARGUMENT if
-                # the API decides the declarations are absent after normalization.
-                config_kwargs["tools"] = [
-                    gtypes.Tool(function_declarations=function_declarations)
-                ]
-        return gtypes.GenerateContentConfig(**config_kwargs)
+            cfg.tools = [gtypes.Tool(function_declarations=tools)]
+            mode_enum = getattr(gtypes.FunctionCallingConfig, "Mode", None)
+            auto_mode = (
+                mode_enum.AUTO
+                if mode_enum is not None
+                else gtypes.FunctionCallingConfigMode.AUTO
+            )
+            cfg.tool_config = gtypes.ToolConfig(
+                function_calling_config=gtypes.FunctionCallingConfig(mode=auto_mode)
+            )
+        return cfg
 
-    def _extract_parts(self, response) -> tuple[list[str], list]:
+    def _extract_parts(self, response) -> tuple[list[str], list, str]:
         """
-        Extract text parts and function_call parts from a Gemini response.
+        Extract text parts, function_call parts, and finish reason.
 
-        Returns (text_list, function_call_list). Gemini may return multiple
-        parts in one response, so callers must handle all of them.
+        Returns (text_list, function_call_list, finish_reason). Gemini may
+        return multiple parts in one response, so callers must handle all of them.
         """
-        texts = []
-        calls = []
+        texts, calls = [], []
+        finish_reason = "STOP"
         try:
             candidate = response.candidates[0]
+            raw_finish_reason = getattr(candidate, "finish_reason", "STOP")
+            finish_reason = getattr(
+                raw_finish_reason, "name", str(raw_finish_reason)
+            ).upper()
+            if not hasattr(candidate, "content") or not candidate.content:
+                return texts, calls, finish_reason
             for part in candidate.content.parts:
-                if hasattr(part, "text") and part.text:
+                if hasattr(part, "text") and part.text and part.text.strip():
                     texts.append(part.text)
                 if hasattr(part, "function_call") and part.function_call:
-                    calls.append(part.function_call)
+                    if (
+                        hasattr(part.function_call, "name")
+                        and part.function_call.name
+                    ):
+                        calls.append(part.function_call)
         except (IndexError, AttributeError, TypeError):
             pass
         if not calls:
             calls = list(getattr(response, "function_calls", None) or [])
-        return texts, calls
+        return texts, calls, finish_reason
 
     def _count_tokens(self, response) -> int:
         """Extract token usage from Gemini response metadata."""
@@ -87,7 +98,7 @@ class AgentBase:
         Finish reasons include STOP, MAX_TOKENS, SAFETY, RECITATION, and OTHER.
         This loop continues only when the response contains function calls.
         """
-        _, calls = self._extract_parts(response)
+        _, calls, _ = self._extract_parts(response)
         return len(calls) == 0
 
     async def run_loop(
@@ -96,63 +107,155 @@ class AgentBase:
         initial_message: str,
         max_iterations: int | None = None,
         extra_tools: list[dict] | None = None,
-        allowed_tools: set[str] | None = None,
+        allowed_tools: list[str] | set[str] | None = None,
         max_tool_calls: int | None = None,
-    ) -> tuple[str, int]:
+        pressure_at: int | None = None,
+        pressure_message: str | None = None,
+        initial_contents: list | None = None,
+        return_history: bool = False,
+    ) -> tuple[str, int] | tuple[str, int, list]:
         """
-        Run the tool-use loop. Returns (final_text, total_tokens).
+        Run the tool-use loop.
+
+        Returns (final_text, total_tokens), or (final_text, total_tokens,
+        contents) when return_history=True.
 
         Gemini requires alternating user/model roles. Multiple tool results from
         one model response are batched into a single user turn.
         """
-        tools = self._get_tool_declarations(allowed_tools)
+        tools = self.tool_server.get_gemini_tools()
         if extra_tools:
             tools.extend(extra_tools)
+        if allowed_tools is not None:
+            allowed_tool_names = set(allowed_tools)
+            tools = [tool for tool in tools if tool["name"] in allowed_tool_names]
 
         system_with_budget = self._with_tool_budget_rules(system_prompt)
         tool_cfg = self._build_config(system_with_budget, tools)
         text_only_cfg = self._build_config(system_with_budget, tools=None)
-        contents = [{"role": "user", "parts": [{"text": initial_message}]}]
+        if initial_contents:
+            contents = list(initial_contents)
+            contents.append({"role": "user", "parts": [{"text": initial_message}]})
+        else:
+            contents = [{"role": "user", "parts": [{"text": initial_message}]}]
 
         total_tokens = 0
         iterations = 0
         tool_calls_made = 0
         tool_budget_exhausted = False
         max_iter = max_iterations or config.MAX_AGENT_ITERATIONS
+        last_texts: list[str] = []
+        seen_calls: dict[str, str] = {}
+        pressure_injected = False
 
         while iterations < max_iter:
             iterations += 1
+            if (
+                pressure_at
+                and not pressure_injected
+                and iterations >= pressure_at
+                and pressure_message
+            ):
+                contents.append({"role": "user", "parts": [{"text": pressure_message}]})
+                pressure_injected = True
+                await self.broadcast(
+                    {
+                        "type": "info",
+                        "message": f"[Pressure injected at iter {iterations}]",
+                    }
+                )
 
             cfg = text_only_cfg if tool_budget_exhausted else tool_cfg
             response = await self._generate_content_with_retries(cfg, contents)
             total_tokens += self._count_tokens(response)
 
-            texts, calls = self._extract_parts(response)
+            texts, calls, finish_reason = self._extract_parts(response)
+            last_texts = texts
+
             if not texts and not calls:
-                if self._is_malformed_function_call(response) and not tool_budget_exhausted:
+                if "MALFORMED" in finish_reason:
                     tool_budget_exhausted = True
                     await self.broadcast(
                         {
                             "type": "info",
                             "message": (
-                                "Gemini returned a malformed function call. "
-                                "Continuing without tools and asking for a final answer."
+                                f"MALFORMED_FUNCTION_CALL at iter {iterations}. "
+                                "Recovering..."
                             ),
                         }
                     )
+                    recovery_msg = (
+                        "Your last tool call was malformed. Do NOT call any tools "
+                        "right now. Respond in plain text only: summarize what you "
+                        "know so far and what your next action will be."
+                    )
+                    contents.append({"role": "user", "parts": [{"text": recovery_msg}]})
                     continue
-                raise RuntimeError(
-                    "Gemini returned empty response "
-                    f"({self._response_diagnostics(response)}) -- possible SAFETY block. "
-                    "Try rephrasing the system prompt."
+
+                await self.broadcast(
+                    {
+                        "type": "info",
+                        "message": (
+                            f"Empty response at iter {iterations} "
+                            f"(finish={finish_reason}). Retrying with clarification."
+                        ),
+                    }
                 )
+                if finish_reason == "SAFETY":
+                    contents.append(
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "text": (
+                                        "Please continue. Focus only on the code "
+                                        "change needed. Respond plainly."
+                                    )
+                                }
+                            ],
+                        }
+                    )
+                else:
+                    contents.append(
+                        {
+                            "role": "user",
+                            "parts": [{"text": "Please continue with your analysis."}],
+                        }
+                    )
+                continue
+
+            if "MALFORMED" in finish_reason:
+                tool_budget_exhausted = True
+                await self.broadcast(
+                    {
+                        "type": "info",
+                        "message": (
+                            f"MALFORMED_FUNCTION_CALL at iter {iterations}. "
+                            "Recovering..."
+                        ),
+                    }
+                )
+                model_parts = [{"text": text} for text in texts if text.strip()]
+                if model_parts:
+                    contents.append({"role": "model", "parts": model_parts})
+                recovery_msg = (
+                    "Your last tool call was malformed. Do NOT call any tools right "
+                    "now. Respond in plain text only: summarize what you know so far "
+                    "and what your next action will be."
+                )
+                contents.append({"role": "user", "parts": [{"text": recovery_msg}]})
+                continue
 
             for text in texts:
                 if text.strip():
                     await self.broadcast({"type": "agent_text", "text": text})
-
-            if not calls:
-                return "\n".join(texts), total_tokens
+                    if "CONTRIBUTOR_DONE" in text:
+                        result_text = "\n".join(last_texts)
+                        return (
+                            (result_text, total_tokens, contents)
+                            if return_history
+                            else (result_text, total_tokens)
+                        )
 
             model_content = self._response_content(response)
             if model_content is not None and getattr(model_content, "parts", None):
@@ -173,10 +276,44 @@ class AgentBase:
                     }
                 )
 
+            if not calls:
+                final_text = "\n".join(texts)
+                return (
+                    (final_text, total_tokens, contents)
+                    if return_history
+                    else (final_text, total_tokens)
+                )
+
             function_response_parts = []
             for call in calls:
                 tool_calls_made += 1
                 args = dict(call.args) if call.args else {}
+                serialized_args = json.dumps(args, sort_keys=True, default=str)
+                dedup_key = f"{call.name}:{serialized_args}"
+
+                if dedup_key in seen_calls:
+                    cached = seen_calls[dedup_key]
+                    await self.broadcast(
+                        {
+                            "type": "tool_result",
+                            "tool": call.name,
+                            "summary": f"[CACHED] {cached[:100]}",
+                            "ok": True,
+                        }
+                    )
+                    function_response_parts.append(
+                        {
+                            "function_response": {
+                                "name": call.name,
+                                "response": {
+                                    "result": f"[Already retrieved] {cached}",
+                                    "cached": True,
+                                },
+                            }
+                        }
+                    )
+                    continue
+
                 await self.broadcast(
                     {
                         "type": "tool_call",
@@ -189,6 +326,8 @@ class AgentBase:
                 result = await self.tool_server.call_tool(call.name, args)
                 result_text = result["content"][0]["text"]
                 is_error = result.get("isError", False)
+                if not is_error:
+                    seen_calls[dedup_key] = result_text
 
                 await self.broadcast(
                     {
@@ -225,9 +364,19 @@ class AgentBase:
                     }
                 )
 
-        raise RuntimeError(f"Agent exceeded max iterations ({max_iter})")
+        final_text = "\n".join(last_texts)
+        await self.broadcast(
+            {"type": "info", "message": f"Max iterations ({max_iter}) reached."}
+        )
+        return (
+            (final_text, total_tokens, contents)
+            if return_history
+            else (final_text, total_tokens)
+        )
 
-    def _get_tool_declarations(self, allowed_tools: set[str] | None) -> list[dict]:
+    def _get_tool_declarations(
+        self, allowed_tools: list[str] | set[str] | None
+    ) -> list[dict]:
         try:
             return self.tool_server.get_gemini_tools(allowed_tools)
         except TypeError:
@@ -264,7 +413,7 @@ TOOL BUDGET RULES:
         )
 
         total_tokens = self._count_tokens(response)
-        texts, _ = self._extract_parts(response)
+        texts, _, _ = self._extract_parts(response)
         final_text = "\n".join(texts)
 
         await self.broadcast({"type": "agent_text", "text": final_text})
@@ -298,9 +447,11 @@ TOOL BUDGET RULES:
                 if self._is_service_unavailable(exc):
                     if attempt == 2:
                         raise
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(10 * (attempt + 1))
                     continue
-                raise
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(5)
 
         raise RuntimeError("Gemini request failed after retries")
 
@@ -332,21 +483,29 @@ TOOL BUDGET RULES:
         if not candidates:
             return False
         finish_reason = getattr(candidates[0], "finish_reason", None)
-        return (
-            finish_reason == "MALFORMED_FUNCTION_CALL"
-            or getattr(finish_reason, "name", None) == "MALFORMED_FUNCTION_CALL"
-        )
+        normalized = getattr(finish_reason, "name", str(finish_reason)).upper()
+        return "MALFORMED" in normalized
 
     def _is_resource_exhausted(self, exc: Exception) -> bool:
         if gexc is not None and isinstance(exc, gexc.ResourceExhausted):
             return True
-        return isinstance(exc, genai_errors.APIError) and (
+        if isinstance(exc, genai_errors.APIError) and (
             exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED"
+        ):
+            return True
+        err_str = str(exc)
+        return (
+            "429" in err_str
+            or "ResourceExhausted" in err_str
+            or "RATE" in err_str.upper()
         )
 
     def _is_service_unavailable(self, exc: Exception) -> bool:
         if gexc is not None and isinstance(exc, gexc.ServiceUnavailable):
             return True
-        return isinstance(exc, genai_errors.APIError) and (
+        if isinstance(exc, genai_errors.APIError) and (
             exc.code == 503 or exc.status == "UNAVAILABLE"
-        )
+        ):
+            return True
+        err_str = str(exc)
+        return "503" in err_str or "ServiceUnavailable" in err_str

@@ -4,8 +4,9 @@ from typing import Iterable
 
 
 SKIP_DIRS = {".git", "vendor", "node_modules", "testdata"}
-MAX_FILE_CHARS = 50_000
-MAX_LIST_FILES = 500
+MAX_FILE_CHARS = 30_000
+MAX_LIST_FILES = 200
+MAX_SEARCH_RESULTS = 20
 
 
 def _safe_path(repo_path: str, path: str = "") -> Path:
@@ -87,11 +88,15 @@ def search_code(
     pattern: str,
     file_pattern: str = "*.go",
     is_regex: bool = False,
-    max_results: int = 50,
+    max_results: int = MAX_SEARCH_RESULTS,
 ) -> list[dict]:
     repo_root = Path(repo_path).resolve()
     _validate_glob_pattern(file_pattern)
     regex = re.compile(pattern) if is_regex else None
+    max_results = min(
+        _positive_int(max_results, MAX_SEARCH_RESULTS),
+        MAX_SEARCH_RESULTS,
+    )
     results: list[dict] = []
 
     for file_path in repo_root.rglob(file_pattern):
@@ -128,3 +133,11 @@ def search_code(
 
 def file_exists(repo_path: str, path: str) -> bool:
     return _safe_path(repo_path, path).exists()
+
+
+def _positive_int(value, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, parsed)
