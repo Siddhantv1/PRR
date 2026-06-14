@@ -1,4 +1,4 @@
-# PRR: Pre-Reviewed Contributor
+# PRR: Pull-Request Robot (Pre-review contributor AI)
 
 PRR is an experimental AI coding workflow for GitHub issues. Given a public GitHub issue URL, it clones the repository, studies the project's conventions, plans a fix, implements the change, simulates maintainer review, revises when needed, and produces a final diff plus a pull request description.
 
