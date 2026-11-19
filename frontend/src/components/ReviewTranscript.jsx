@@ -1,10 +1,10 @@
 import { HelpCircle, Lightbulb, ShieldCheck, XOctagon } from 'lucide-react'
 
 const COMMENT_META = {
-  BLOCKING: { icon: XOctagon, label: 'BLOCKING' },
-  SUGGESTION: { icon: Lightbulb, label: 'SUGGESTION' },
-  QUESTION: { icon: HelpCircle, label: 'QUESTION' },
-  APPROVED: { icon: ShieldCheck, label: 'APPROVED' },
+  BLOCKING: { icon: XOctagon, label: 'blocking' },
+  SUGGESTION: { icon: Lightbulb, label: 'suggestion' },
+  QUESTION: { icon: HelpCircle, label: 'question' },
+  APPROVED: { icon: ShieldCheck, label: 'approved' },
 }
 
 function normalizeComment(comment) {
@@ -32,21 +32,31 @@ export function ReviewTranscript({ reviewComments, revisionRounds = 0 }) {
     <section className="panel review-transcript">
       <div className="transcript-header">
         <h2>Review Transcript</h2>
-        <p>
-          {totalRounds} revision round(s) · {comments.length} total comments ·{' '}
-          {approved ? 'Approved' : 'Pending'}
-        </p>
+        <dl className="transcript-stats">
+          <div>
+            <dt>revision round(s)</dt>
+            <dd>{totalRounds}</dd>
+          </div>
+          <div>
+            <dt>total comments</dt>
+            <dd>{comments.length}</dd>
+          </div>
+          <div>
+            <dt>status</dt>
+            <dd>{approved ? 'Approved' : 'Pending'}</dd>
+          </div>
+        </dl>
       </div>
 
       {approved ? (
         <div className="approved-banner">
           <ShieldCheck size={18} />
-          <span>✓ Maintainer Approved</span>
+          <span>Maintainer Approved</span>
         </div>
       ) : null}
 
       {comments.length === 0 ? (
-        <p className="muted">Waiting for maintainer review...</p>
+        <p className="muted">Waiting for maintainer review…</p>
       ) : (
         <div className="round-list">
           {Object.entries(rounds)
@@ -65,7 +75,7 @@ export function ReviewTranscript({ reviewComments, revisionRounds = 0 }) {
                       >
                         <div className="transcript-tag">
                           <Icon size={16} />
-                          <span>[{meta.label}]</span>
+                          <span>{meta.label}</span>
                         </div>
                         <p>{comment.text}</p>
                       </article>

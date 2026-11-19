@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, X } from 'lucide-react'
 
-const STAGE_LABELS = [
-  ['dna_extractor', 'DNA Extractor'],
-  ['issue_analyst', 'Issue Analyst'],
-  ['contributor', 'Contributor'],
-  ['maintainer', 'Maintainer'],
-  ['output_generator', 'Output'],
-]
+import { STAGE_LABELS } from './stages'
 
 function StatusIndicator({ status }) {
   if (status === 'complete') {
@@ -60,7 +54,7 @@ export function PipelineProgress({
   revisionRound = 0,
   maxRevisionRounds = 2,
   currentDescription = 'Preparing run',
-  lastActivity = 'Waiting for agent...',
+  lastActivity = 'Waiting for agent…',
   startedAt,
   hasResult = false,
   hasError = false,
@@ -83,10 +77,7 @@ export function PipelineProgress({
   return (
     <section className="progress-panel" aria-label="Pipeline progress">
       <div className="progress-summary">
-        <div>
-          <p className="eyebrow">Current step</p>
-          <h2>{currentDescription}</h2>
-        </div>
+        <h2>{currentDescription}</h2>
         <div className="progress-stats">
           <span>{progress}%</span>
           <span>{formatElapsed(startedAt, now)}</span>
@@ -94,19 +85,29 @@ export function PipelineProgress({
       </div>
       <div
         className={`progress-track ${hasResult ? 'complete' : ''} ${hasError ? 'error' : ''}`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
         aria-label={`Run progress ${progress}%`}
       >
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
+        <div className="progress-fill" style={{ transform: `scaleX(${progress / 100})` }} />
       </div>
       <div className="activity-strip" aria-live="polite">
-        <span className={`activity-pulse ${hasError ? 'error' : ''}`} />
-        <span>{lastActivity}</span>
+        <span>
+          {lastActivity}
+          <span
+            className={`caret ${hasError ? 'error' : ''}`}
+            key={lastActivity}
+            aria-hidden="true"
+          />
+        </span>
       </div>
       <div className="stage-row">
         {STAGE_LABELS.map(([key, label], index) => {
           const status = stages[key] || 'pending'
-          const stageLabel = status === 'running' ? `${label} ...` : label
-          const separator = key === 'contributor' ? '⇄' : '→'
+          const stageLabel = status === 'running' ? `${label} …` : label
+          const separator = key === 'contributor' ? '<->' : '->'
           return (
             <div className="stage-wrap" key={key}>
               <div className={`stage-pill ${status} ${activeStage === key ? 'active' : ''}`}>

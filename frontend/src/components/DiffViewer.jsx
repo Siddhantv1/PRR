@@ -44,6 +44,46 @@ function parseDiff(diff) {
   }
 }
 
+// The viewer's own palette, mapped onto the page tokens: added lines on the accent
+// wash, removed lines in red on a red wash, as git prints them.
+const DIFF_STYLES = {
+  variables: {
+    dark: {
+      diffViewerBackground: 'var(--color-paper-2)',
+      diffViewerColor: 'var(--color-ink-2)',
+      diffViewerTitleBackground: 'var(--color-paper-3)',
+      diffViewerTitleColor: 'var(--color-ink)',
+      diffViewerTitleBorderColor: 'var(--color-rule)',
+      addedBackground: 'var(--color-accent-wash)',
+      addedColor: 'var(--color-ink)',
+      removedBackground: 'var(--color-removed-wash)',
+      removedColor: 'var(--color-removed)',
+      changedBackground: 'var(--color-paper-3)',
+      wordAddedBackground: 'var(--color-rule-2)',
+      wordRemovedBackground: 'var(--color-removed-word)',
+      addedGutterBackground: 'var(--color-accent-wash)',
+      removedGutterBackground: 'var(--color-removed-wash)',
+      gutterBackground: 'var(--color-paper-2)',
+      gutterBackgroundDark: 'var(--color-paper-2)',
+      highlightBackground: 'var(--color-paper-3)',
+      highlightGutterBackground: 'var(--color-paper-3)',
+      codeFoldGutterBackground: 'var(--color-paper-3)',
+      codeFoldBackground: 'var(--color-paper-3)',
+      emptyLineBackground: 'var(--color-paper-2)',
+      gutterColor: 'var(--color-muted)',
+      addedGutterColor: 'var(--color-accent)',
+      removedGutterColor: 'var(--color-removed)',
+      codeFoldContentColor: 'var(--color-muted)',
+    },
+  },
+  diffContainer: { fontSize: 'var(--text-sm)' },
+  contentText: { fontFamily: 'var(--font-body)' },
+  codeFoldContent: { fontFamily: 'var(--font-body)' },
+  lineNumber: { fontFamily: 'var(--font-body)' },
+  // contentText sets its own colour, so removed rows need it restated on the spans
+  diffRemoved: { '& span': { color: 'var(--color-removed)' } },
+}
+
 export function DiffViewer({ diff }) {
   const [copied, setCopied] = useState(false)
   const normalizedDiff = diff || ''
@@ -75,7 +115,7 @@ export function DiffViewer({ diff }) {
             +{parsed.additions} lines / -{parsed.deletions} lines
           </p>
         </div>
-        <button type="button" className="copy-button" onClick={copyDiff}>
+        <button type="button" className="copy-button" onClick={copyDiff} data-copied={copied}>
           {copied ? <CopyCheck size={15} /> : <Copy size={15} />}
           {copied ? 'Copied' : 'Copy diff'}
         </button>
@@ -87,6 +127,8 @@ export function DiffViewer({ diff }) {
           splitView={false}
           useDarkTheme
           hideLineNumbers={false}
+          hideSummary
+          styles={DIFF_STYLES}
         />
       </div>
     </section>

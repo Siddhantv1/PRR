@@ -31,7 +31,7 @@ function initialState() {
     startedAt: new Date().toISOString(),
     currentStage: null,
     currentDescription: 'Preparing run',
-    lastActivity: 'Waiting for agent...',
+    lastActivity: 'Waiting for agent…',
   }
 }
 

@@ -1,0 +1,31 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "terminal",
+  "axes": "dark/mono/chromatic-green",
+  "hero": "none",
+  "nav": "top bar with wordmark block",
+  "footer": "none",
+  "imagery": "none",
+  "photos": [],
+  "entry": "progress block",
+  "fingerprint": "app/topbar/progress/result-first/two-column-log/none",
+  "sections": [
+   "topbar",
+   "progress",
+   "diff",
+   "pr preview",
+   "live stream",
+   "review transcript"
+  ],
+  "signature": "five-stage pipeline line and the run as a shell session",
+  "waived": [
+   "39b"
+  ],
+  "prompt": "redesign PRR frontend, terminal theme",
+  "date": "2026-11-19"
+ }
+]

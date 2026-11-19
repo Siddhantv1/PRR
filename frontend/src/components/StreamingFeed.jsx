@@ -68,7 +68,8 @@ function ToolResultEvent({ event }) {
       <div className="stream-content">
         <div className="stream-meta">
           <strong>
-            {event.tool} {ok ? '✓' : '✗'}
+            {event.tool}
+            <span className={`result-flag ${ok ? 'ok' : 'failed'}`}>{ok ? 'ok' : 'failed'}</span>
           </strong>
           <time>{relativeTime(event.receivedAt)}</time>
         </div>
@@ -100,7 +101,7 @@ function ReviewCommentEvent({ event }) {
     <article className={`stream-event review-stream ${kind.toLowerCase()}`}>
       <div className="stream-content full">
         <div className="stream-meta">
-          <span className={`review-badge ${kind.toLowerCase()}`}>[{kind}]</span>
+          <span className={`review-badge ${kind.toLowerCase()}`}>{kind.toLowerCase()}</span>
           <time>{relativeTime(event.receivedAt)}</time>
         </div>
         <p>{event.text}</p>
@@ -112,7 +113,7 @@ function ReviewCommentEvent({ event }) {
 function RevisionStartEvent({ event }) {
   return (
     <div className="revision-divider">
-      <span>── Revision Round {event.round} of {event.total} ──</span>
+      <span>Revision Round {event.round} of {event.total}</span>
     </div>
   )
 }
@@ -158,23 +159,26 @@ function StreamEvent({ event, eventKey }) {
 }
 
 export function StreamingFeed({ events }) {
-  const bottomRef = useRef(null)
+  const feedRef = useRef(null)
 
+  // Scroll the feed only, never the window: on a finished run the result sits above it.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const feed = feedRef.current
+    if (feed) {
+      feed.scrollTop = feed.scrollHeight
+    }
   }, [events])
 
   if (!events.length) {
     return (
-      <div className="streaming-feed empty">
-        <p>Waiting for agent...</p>
-        <div ref={bottomRef} />
+      <div className="streaming-feed empty" ref={feedRef}>
+        <p>Waiting for agent…</p>
       </div>
     )
   }
 
   return (
-    <div className="streaming-feed">
+    <div className="streaming-feed" ref={feedRef}>
       {events.map((event, index) => (
         <StreamEvent
           event={event}
@@ -182,7 +186,6 @@ export function StreamingFeed({ events }) {
           key={`${event.receivedAt || 'event'}-${index}`}
         />
       ))}
-      <div ref={bottomRef} />
     </div>
   )
 }
