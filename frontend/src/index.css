@@ -7,6 +7,13 @@
 @import url("./tokens.css");
 @import url("./base.css");
 
+/* removed diff lines read red, as git prints them: the one place a second hue is asked for */
+:root {
+  --color-removed: oklch(76% 0.15 25);
+  --color-removed-wash: oklch(22% 0.06 25);
+  --color-removed-word: oklch(34% 0.11 25);
+}
+
 body {
   min-height: 100dvh;
   font-stretch: var(--stretch-body);
