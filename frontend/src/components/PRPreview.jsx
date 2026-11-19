@@ -18,19 +18,26 @@ export function PRPreview({ title, body }) {
           <h2>Pull Request Preview</h2>
           <p>PR opening is intentionally manual</p>
         </div>
-        <button type="button" className="copy-button" onClick={copyDescription}>
+        <button
+          type="button"
+          className="copy-button"
+          onClick={copyDescription}
+          data-copied={copied}
+        >
           {copied ? <CopyCheck size={15} /> : <Copy size={15} />}
           {copied ? 'Copied' : 'Copy PR description'}
         </button>
       </div>
 
-      <div className="github-pr-title">{title}</div>
-      <div className="github-pr-body markdown-body">
-        <ReactMarkdown>{body}</ReactMarkdown>
+      <div className="pr-sheet">
+        <div className="github-pr-title">{title}</div>
+        <div className="github-pr-body markdown-body">
+          <ReactMarkdown>{body}</ReactMarkdown>
+        </div>
       </div>
       <button type="button" className="faux-pr-button" disabled>
         <GitPullRequestArrow size={16} />
-        Would open PR →
+        Would open PR
       </button>
     </section>
   )

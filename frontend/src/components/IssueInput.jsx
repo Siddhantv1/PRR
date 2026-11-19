@@ -1,5 +1,8 @@
-import { FolderGit2, Loader2, Send } from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 import { useState } from 'react'
+
+import { PipelineGlyph } from './PipelineGlyph'
+import { STAGE_LABELS } from './stages'
 
 const ISSUE_URL_RE = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+$/
 
@@ -38,32 +41,59 @@ export function IssueInput({ onRunCreated }) {
   }
 
   return (
-    <main className="home-shell">
-      <form className="issue-card" onSubmit={handleSubmit}>
-        <div className="brand-mark" aria-hidden="true">
-          <FolderGit2 size={22} />
+    <div className="home">
+      <header className="topbar">
+        <div className="container topbar__inner">
+          <span className="wordmark">prr</span>
         </div>
-        <h1>Pre-Reviewed Contributor</h1>
-        <p className="subtitle">
-          Paste a GitHub issue URL. The agent will fix it, then review its own work.
-        </p>
-        <label className="input-label" htmlFor="issue-url">
-          Issue URL
-        </label>
-        <input
-          id="issue-url"
-          type="url"
-          value={url}
-          placeholder="https://github.com/spf13/cobra/issues/..."
-          onChange={(event) => setUrl(event.target.value)}
-          spellCheck="false"
-        />
-        {error ? <p className="error-text">{error}</p> : null}
-        <button type="submit" disabled={loading}>
-          {loading ? <Loader2 size={17} className="spin" /> : <Send size={17} />}
-          {loading ? 'Starting' : 'Run Agent'}
-        </button>
-      </form>
-    </main>
+      </header>
+      <main className="home__main home__grid container">
+        <form className="issue-form" onSubmit={handleSubmit}>
+          <h1>Pre-Reviewed Contributor</h1>
+          <p className="subtitle">
+            Paste a GitHub issue URL. The agent will fix it, then review its own work.
+          </p>
+          <div className="issue-field">
+            <label className="input-label" htmlFor="issue-url">
+              Issue URL
+            </label>
+            <div className="issue-field__row">
+              <input
+                id="issue-url"
+                type="url"
+                inputMode="url"
+                autoComplete="off"
+                value={url}
+                placeholder="https://github.com/spf13/cobra/issues/…"
+                onChange={(event) => setUrl(event.target.value)}
+                spellCheck="false"
+                aria-invalid={error ? 'true' : undefined}
+                aria-describedby="issue-url-help"
+              />
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={loading}
+                aria-busy={loading ? 'true' : undefined}
+              >
+                {loading ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+                {loading ? 'Starting' : 'Run Agent'}
+              </button>
+            </div>
+            <p className="error-text" id="issue-url-help" aria-live="polite">
+              {error}
+            </p>
+          </div>
+          <ol className="pipeline" aria-label="Pipeline stages">
+            {STAGE_LABELS.map(([key, label]) => (
+              <li key={key} data-loop={key === 'contributor' ? '' : undefined}>
+                {label}
+              </li>
+            ))}
+          </ol>
+        </form>
+        <PipelineGlyph />
+      </main>
+    </div>
   )
 }
