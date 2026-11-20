@@ -156,14 +156,9 @@ button:disabled {
 
 /* ---------- home ---------- */
 
-.home {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-rows: auto 1fr;
-}
-
 .home__main {
-  padding-block: var(--space-3xl) var(--space-2xl);
+  min-height: calc(100dvh - 57px);
+  padding-block: var(--space-2xl);
 }
 
 .issue-form {
@@ -238,34 +233,6 @@ button:disabled {
   font-weight: 500;
 }
 
-/* the pipeline line: the product's five stages, typed as a diagram */
-.pipeline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs) var(--space-sm);
-  margin: var(--space-xl) 0 0;
-  padding: var(--space-md) 0 0;
-  border-top: var(--rule-hair) solid var(--color-rule);
-  list-style: none;
-  color: var(--color-ink-2);
-  font-size: var(--text-sm);
-}
-
-.pipeline li {
-  display: inline-flex;
-  gap: var(--space-sm);
-  white-space: nowrap;
-}
-
-.pipeline li:not(:last-child)::after {
-  content: "->";
-  color: var(--color-muted);
-}
-
-.pipeline li[data-loop]::after {
-  content: "<->";
-}
-
 /* the pipeline as a glyph picture, drawn on a canvas by PipelineGlyph */
 .home__grid {
   display: grid;
@@ -295,8 +262,265 @@ button:disabled {
   height: 100%;
 }
 
-.glyph-toggle {
-  min-height: 32px;
+/* ---------- home sections ---------- */
+
+html {
+  scroll-behavior: smooth;
+}
+
+.topbar__nav {
+  display: flex;
+  gap: var(--space-lg);
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
+.topbar__nav a {
+  color: var(--color-ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar__nav a:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+/* a hairline above each section, drawn inside the gutters */
+.home-section {
+  padding-block: var(--space-3xl);
+  background: linear-gradient(var(--color-rule), var(--color-rule)) center top /
+    calc(100% - 2 * var(--gutter)) 1px no-repeat;
+}
+
+.home-section h2 {
+  max-width: 26ch;
+  font-size: var(--text-3xl);
+}
+
+.home-section__lead {
+  max-width: 60ch;
+  margin-top: var(--space-lg);
+  color: var(--color-ink-2);
+  line-height: 1.7;
+}
+
+.what {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2xl) var(--gap-columns);
+  align-items: center;
+}
+
+.compare {
+  margin: 0;
+  border: var(--rule-hair) solid var(--color-rule);
+  background: var(--color-paper-2);
+  font-size: var(--text-sm);
+}
+
+.compare__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: var(--rule-hair) solid var(--color-rule-2);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.compare__line {
+  padding: var(--space-xs) var(--space-md);
+  line-height: 1.6;
+}
+
+.compare__line::before {
+  display: inline-block;
+  width: 2ch;
+}
+
+.compare__line.del {
+  background: var(--color-removed-wash);
+  color: var(--color-removed);
+}
+
+.compare__line.del::before {
+  content: "-";
+}
+
+.compare__line.add {
+  background: var(--color-accent-wash);
+  color: var(--color-ink);
+}
+
+.compare__line.add::before {
+  content: "+";
+  color: var(--color-accent);
+}
+
+.stages {
+  margin: var(--space-xl) 0 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.stages li {
+  display: grid;
+  grid-template-columns: 4ch minmax(0, 4fr) minmax(0, 7fr);
+  gap: var(--space-lg);
+  align-items: baseline;
+  padding-block: var(--space-lg);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.stages__num {
+  color: var(--color-muted);
+  font-size: var(--text-xl);
+  font-stretch: var(--stretch-display);
+}
+
+.stages h3 {
+  max-width: none;
+  font-size: var(--text-xl);
+}
+
+.stages p {
+  max-width: 62ch;
+  color: var(--color-ink-2);
+  line-height: 1.65;
+}
+
+.outputs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: var(--space-xl) 0 0;
+}
+
+.outputs div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-xs);
+  padding: 0 var(--space-lg);
+  border-left: var(--rule-hair) solid var(--color-rule);
+}
+
+.outputs div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.outputs dt {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  font-stretch: var(--stretch-display);
+}
+
+.outputs dd {
+  margin: 0;
+  color: var(--color-ink-2);
+  line-height: 1.6;
+}
+
+.limits {
+  max-width: 75ch;
+  margin: var(--space-xl) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.limits li {
+  position: relative;
+  padding: var(--space-md) 0 var(--space-md) var(--space-lg);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  color: var(--color-ink-2);
+  line-height: 1.65;
+}
+
+.limits li::before {
+  content: "#";
+  position: absolute;
+  left: 0;
+  color: var(--color-muted);
+}
+
+.limits code {
+  padding: 0 var(--space-2xs);
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.closing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.site-footer {
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.site-footer__inner {
+  min-height: 72px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.site-footer .wordmark {
+  display: inline-flex;
+  margin-right: var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+}
+
+.site-footer a {
+  color: var(--color-ink-2);
+  text-decoration-style: dotted;
+}
+
+.site-footer a:hover {
+  color: var(--color-ink);
+}
+
+/* ---------- scrollbars, site-wide ---------- */
+/* Chromium ignores ::-webkit-scrollbar once scrollbar-color is set, so the
+   standard properties apply only where those rules are unsupported (Firefox). */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: var(--color-rule-2) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-ink-2);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-rule-2) transparent;
+  }
 }
 
 /* ---------- run ---------- */
@@ -960,8 +1184,31 @@ button:disabled {
 /* ---------- small screens ---------- */
 
 @media (max-width: 60rem) {
-  .home__grid {
+  .home__grid,
+  .what {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home__main {
+    min-height: 0;
+  }
+
+  .stages li {
+    grid-template-columns: 4ch minmax(0, 1fr);
+  }
+
+  .stages p {
+    grid-column: 2;
+  }
+
+  .outputs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--space-xl);
+  }
+
+  .outputs div:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
   }
 
   .pipeline-diagram {
@@ -984,8 +1231,24 @@ button:disabled {
 }
 
 @media (max-width: 40rem) {
-  .pipeline-diagram {
+  .pipeline-diagram,
+  .topbar__nav {
     display: none;
+  }
+
+  .home-section {
+    padding-block: var(--space-2xl);
+  }
+
+  .outputs {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .outputs div {
+    padding: var(--space-md) 0;
+    border-left: 0;
+    border-top: var(--rule-hair) solid var(--color-rule);
   }
 
   .home__main {
@@ -1029,9 +1292,5 @@ button:disabled {
 
   .spin {
     animation: none;
-  }
-
-  .glyph-toggle {
-    display: none;
   }
 }

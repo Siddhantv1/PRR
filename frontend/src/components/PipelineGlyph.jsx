@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { STAGE_LABELS } from './stages'
 
@@ -28,12 +28,6 @@ function readTokens() {
 export function PipelineGlyph() {
   const stageRef = useRef(null)
   const canvasRef = useRef(null)
-  const pausedRef = useRef(false)
-  const [paused, setPaused] = useState(false)
-
-  useEffect(() => {
-    pausedRef.current = paused
-  }, [paused])
 
   useEffect(() => {
     const stage = stageRef.current
@@ -209,7 +203,7 @@ export function PipelineGlyph() {
       raf = 0
       const dt = Math.min(64, now - last)
       last = now
-      const spinning = !reduce && !pausedRef.current && !state.hover && !state.focus
+      const spinning = !reduce && !state.hover && !state.focus
       if (spinning) angle += (dt / TURN_MS) * Math.PI * 2
 
       let hot = false
@@ -256,7 +250,7 @@ export function PipelineGlyph() {
       pointer.on = true
     }
     const onEnter = () => {
-      state.hover = true
+      state.hover = false
     }
     const onLeave = () => {
       state.hover = false

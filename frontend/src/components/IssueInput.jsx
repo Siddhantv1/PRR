@@ -1,8 +1,8 @@
 import { Loader2, Send } from 'lucide-react'
 import { useState } from 'react'
 
+import { HomeSections } from './HomeSections'
 import { PipelineGlyph } from './PipelineGlyph'
-import { STAGE_LABELS } from './stages'
 
 const ISSUE_URL_RE = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+$/
 
@@ -45,9 +45,15 @@ export function IssueInput({ onRunCreated }) {
       <header className="topbar">
         <div className="container topbar__inner">
           <span className="wordmark">prr</span>
+          <nav className="topbar__nav" aria-label="Sections">
+            <a href="#what">What it is</a>
+            <a href="#how">How it works</a>
+            <a href="#limits">Before you run it</a>
+          </nav>
         </div>
       </header>
-      <main className="home__main home__grid container">
+      <main>
+        <section className="home__main home__grid container" aria-label="Run the agent">
         <form className="issue-form" onSubmit={handleSubmit}>
           <h1>Pre-Reviewed Contributor</h1>
           <p className="subtitle">
@@ -84,15 +90,10 @@ export function IssueInput({ onRunCreated }) {
               {error}
             </p>
           </div>
-          <ol className="pipeline" aria-label="Pipeline stages">
-            {STAGE_LABELS.map(([key, label]) => (
-              <li key={key} data-loop={key === 'contributor' ? '' : undefined}>
-                {label}
-              </li>
-            ))}
-          </ol>
         </form>
         <PipelineGlyph />
+        </section>
+        <HomeSections />
       </main>
     </div>
   )
