@@ -2,7 +2,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    GOOGLE_API_KEY: str
+    # "gemini", or "openai" for any OpenAI-compatible API (Groq, OpenRouter, Ollama)
+    LLM_PROVIDER: str = "gemini"
+    GOOGLE_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.groq.com/openai/v1"
+    OPENAI_API_KEY: str = ""
     GITHUB_TOKEN: str
     REPOS_DIR: str = "/tmp/repos"
     DB_PATH: str = "./data/runs.db"

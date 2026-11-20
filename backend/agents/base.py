@@ -11,8 +11,11 @@ try:
 except ImportError:
     gexc = None
 
+from backend.agents.openai_compat import OpenAICompatClient
 from backend.config import config
 from backend.mcp_server.server import ToolServer
+
+USE_OPENAI = config.LLM_PROVIDER.lower() == "openai"
 
 
 class AgentBase:
@@ -23,14 +26,21 @@ class AgentBase:
     ):
         self.tool_server = tool_server
         self.broadcast = broadcast_fn
-        self.client = genai.Client(api_key=config.GOOGLE_API_KEY)
+        if USE_OPENAI:
+            self.client = OpenAICompatClient(
+                config.OPENAI_BASE_URL, config.OPENAI_API_KEY, config.MODEL
+            )
+        else:
+            self.client = genai.Client(api_key=config.GOOGLE_API_KEY)
 
     def _build_config(
         self,
         system_prompt: str,
         tools: list[dict] | None = None,
-    ) -> gtypes.GenerateContentConfig:
+    ) -> gtypes.GenerateContentConfig | dict:
         """Build GenerateContentConfig with system instruction and optional tools."""
+        if USE_OPENAI:
+            return {"system": system_prompt, "tools": tools}
         cfg = gtypes.GenerateContentConfig(
             system_instruction=system_prompt,
             max_output_tokens=8192,
@@ -421,11 +431,13 @@ TOOL BUDGET RULES:
 
     async def _generate_content_with_retries(
         self,
-        cfg: gtypes.GenerateContentConfig,
+        cfg: gtypes.GenerateContentConfig | dict,
         contents: list[dict],
     ):
         for attempt in range(3):
             try:
+                if USE_OPENAI:
+                    return await self.client.generate(cfg["system"], cfg["tools"], contents)
                 return await self.client.aio.models.generate_content(
                     model=config.MODEL,
                     config=cfg,
@@ -453,7 +465,7 @@ TOOL BUDGET RULES:
                     raise
                 await asyncio.sleep(5)
 
-        raise RuntimeError("Gemini request failed after retries")
+        raise RuntimeError("LLM request failed after retries")
 
     def _response_content(self, response):
         candidates = getattr(response, "candidates", None) or []
