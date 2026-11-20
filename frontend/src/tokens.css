@@ -8,13 +8,14 @@
   --color-error: oklch(72% 0.15 27); --color-success: oklch(76% 0.13 150);
   --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
   --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
-  --color-paper: oklch(12.5% 0.012 150); --color-paper-2: oklch(16% 0.016 150); --color-paper-3: oklch(20.5% 0.022 150);
-  --color-ink: oklch(94% 0.03 140); --color-ink-2: oklch(82% 0.05 142); --color-muted: oklch(64% 0.06 145);
-  --color-rule: oklch(27% 0.028 148); --color-rule-2: oklch(38% 0.045 146);
+  /* neutrals are cool graphite, not green: green is kept for signals only */
+  --color-paper: oklch(14% 0.005 250); --color-paper-2: oklch(17.5% 0.006 250); --color-paper-3: oklch(22% 0.007 250);
+  --color-ink: oklch(94% 0.005 250); --color-ink-2: oklch(81% 0.008 250); --color-muted: oklch(65% 0.01 250);
+  --color-rule: oklch(28% 0.008 250); --color-rule-2: oklch(40% 0.01 250);
   --color-accent: oklch(87% 0.2 142); --color-accent-ink: oklch(14% 0.02 150); --color-focus: oklch(87% 0.2 142);
   --color-accent-wash: oklch(23% 0.06 145);
-  --glyph-0: oklch(30% 0.06 146); --glyph-1: oklch(38% 0.08 145); --glyph-2: oklch(47% 0.11 144); --glyph-3: oklch(57% 0.14 143);
-  --glyph-4: oklch(67% 0.17 142); --glyph-5: oklch(77% 0.19 142); --glyph-6: oklch(86% 0.2 141); --glyph-7: oklch(94% 0.12 138);
+  --glyph-0: oklch(30% 0.006 250); --glyph-1: oklch(38% 0.007 250); --glyph-2: oklch(47% 0.008 250); --glyph-3: oklch(57% 0.009 250);
+  --glyph-4: oklch(66% 0.01 250); --glyph-5: oklch(75% 0.01 250); --glyph-6: oklch(85% 0.008 250); --glyph-7: oklch(94% 0.005 250);
   --font-display: "Martian Mono", ui-monospace, monospace; --font-body: var(--font-display); --font-outlier: var(--font-display);
   --radius-card: 0; --radius-pill: 0; --rule-hair: 1px; --shadow-card: none;
   --tracking-display: -0.02em; --display-weight: 500; --stretch-display: 112.5%; --stretch-body: 87.5%;

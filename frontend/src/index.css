@@ -1,6 +1,6 @@
 /* Hallmark · shape: app screen · genre: atmospheric · theme: Terminal (by request) · redesign: full
  * nav: top bar, wordmark block, back action and live state on the run screen · signature: the pipeline as a turning glyph picture that flares under the pointer, and the run read as a shell session · states: loading, empty, live, complete, failed
- * axes: dark/mono/chromatic-green · posture: committed · contrast: pass · v2.0.0 */
+ * axes: dark/mono/chromatic-green · posture: restrained, graphite neutrals with green kept for signals (by request: the green-cast ground read as too green) · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: H, five regions of equal weight on the run screen; the diff and PR now lead once the result exists and the stream steps below */
 /* Hallmark · waive 39b · the tool-call disclosure button is the argument text itself and grows with it, and the diff's code-fold row belongs to react-diff-viewer · the run log needs both to read and expand tool arguments */
 /* Hallmark · finish-review: subagent · 7 findings · 7 resolved · gap: none */
@@ -692,7 +692,7 @@ button:disabled {
 }
 
 .stream-collapse pre {
-  color: var(--color-accent);
+  color: var(--color-ink-2);
   line-height: 1.55;
 }
 
@@ -939,7 +939,7 @@ button:disabled {
 .markdown-body code {
   padding: 0 var(--space-2xs);
   background: var(--color-paper-3);
-  color: var(--color-accent);
+  color: var(--color-ink);
 }
 
 .markdown-body a {

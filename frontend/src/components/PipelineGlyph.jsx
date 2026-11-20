@@ -318,14 +318,7 @@ export function PipelineGlyph() {
       <div className="pipeline-diagram__stage" ref={stageRef}>
         <canvas ref={canvasRef} aria-hidden="true" />
       </div>
-      <button
-        type="button"
-        className="btn glyph-toggle"
-        aria-pressed={paused}
-        onClick={() => setPaused((current) => !current)}
-      >
-        {paused ? 'Play' : 'Pause'}
-      </button>
+
     </figure>
   )
 }
