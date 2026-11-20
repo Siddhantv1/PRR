@@ -43,7 +43,8 @@ The frontend streams the entire process live, including tool calls, tool results
 PRR/
   backend/
     agents/
-      base.py              # Shared Gemini function-calling loop
+      base.py              # Shared function-calling loop (Gemini or OpenAI-compatible)
+      openai_compat.py     # Adapter for OpenAI-compatible APIs (Groq, OpenRouter, Ollama)
       dna_extractor.py     # Stage 1: Project Constitution
       issue_analyst.py     # Stage 2: issue triage and fix plan
       contributor.py       # Stage 3: code implementation
@@ -108,7 +109,7 @@ flowchart TD
 - Python **3.12** recommended
 - Node.js and npm
 - Go toolchain available on `PATH` for repositories that need `go test`, `go vet`, and `go build`
-- Google Gemini API key
+- An LLM API key: Google Gemini, or a free OpenAI-compatible provider such as Groq (see [LLM provider](#llm-provider))
 - GitHub token with access to the target repository
 
 Python 3.12 matters because the pinned backend dependency `pydantic==2.7.1` depends on `pydantic-core==2.18.2`, which does not build cleanly on Python 3.14 in this environment.
@@ -129,7 +130,7 @@ Create a local environment file:
 cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` (Gemini shown; for a free provider see [LLM provider](#llm-provider)):
 
 ```env
 GOOGLE_API_KEY=AIza...
@@ -148,6 +149,25 @@ MAX_REVISION_ROUNDS=2
 MAX_AGENT_ITERATIONS=25
 MODEL=gemini-3.1-flash-lite
 ```
+
+### LLM provider
+
+Gemini is the default. To use a free provider instead, set `LLM_PROVIDER=openai` and point it at any OpenAI-compatible chat completions API that supports tool calling:
+
+| Provider | `OPENAI_BASE_URL` | `OPENAI_API_KEY` | Example `MODEL` |
+| --- | --- | --- | --- |
+| Groq (free tier, rate limited) | `https://api.groq.com/openai/v1` | key from console.groq.com | `llama-3.3-70b-versatile` |
+| OpenRouter (`:free` models) | `https://openrouter.ai/api/v1` | key from openrouter.ai | a model ending in `:free` |
+| Ollama (local, no key) | `http://localhost:11434/v1` | leave empty | a pulled model with tool support |
+
+```env
+LLM_PROVIDER=openai
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+OPENAI_API_KEY=gsk_...
+MODEL=llama-3.3-70b-versatile
+```
+
+Model names and free-tier limits change; check the provider's model list. Free tiers rate limit per minute, and the agents retry on HTTP 429. The adapter lives in `backend/agents/openai_compat.py`; `python backend/test_openai_compat.py` checks it offline.
 
 Run the backend:
 
@@ -288,7 +308,7 @@ Common event types:
 | `stage_start` | Marks a pipeline stage as running |
 | `stage_complete` | Marks a stage as complete |
 | `revision_start` | Begins a contributor/maintainer revision round |
-| `tool_call` | Shows a tool invocation requested by Gemini |
+| `tool_call` | Shows a tool invocation requested by the model |
 | `tool_result` | Shows the result of a tool invocation |
 | `agent_text` | Streams agent text output |
 | `review_comment` | Emits maintainer review comments |
@@ -370,7 +390,7 @@ Produces the final pull request title and body, using the diff, issue analysis, 
 
 ## Tool Server
 
-The `ToolServer` is the execution layer for Gemini function calls.
+The `ToolServer` is the execution layer for the model's function calls.
 
 File:
 
@@ -378,7 +398,7 @@ File:
 backend/mcp_server/server.py
 ```
 
-When Gemini asks to use a tool, the agent base loop calls:
+When the model asks to use a tool, the agent base loop calls:
 
 ```python
 await tool_server.call_tool(name, arguments)
@@ -488,6 +508,7 @@ Smoke checks used during development:
 ```bash
 source .venv/bin/activate
 python -m py_compile backend/agents/*.py backend/api/*.py backend/db/*.py
+python backend/test_openai_compat.py
 cd frontend && npm run lint && npm run build
 ```
 
@@ -495,14 +516,14 @@ cd frontend && npm run lint && npm run build
 
 - The system currently generates a diff and PR description; it does not open a pull request automatically.
 - The repo is cloned into `REPOS_DIR` using a tokenized HTTPS URL.
-- Live end-to-end runs require network access to GitHub and Google Gemini.
+- Live end-to-end runs require network access to GitHub and the configured LLM provider.
 - Target repositories must have the relevant language toolchain installed locally. For current Go workflows, `go` must be on `PATH`.
 - The maintainer review is simulated by an LLM. It is useful for pre-review, but it is not a substitute for an actual project maintainer.
 - The frontend intentionally keeps PR opening manual.
 
 ## Security Notes
 
-- GitHub and Google Gemini tokens are loaded from environment variables.
+- GitHub and LLM API keys are loaded from environment variables.
 - Tool file access is constrained to the cloned repository path.
 - The Contributor Agent is instructed to make changes only through the ToolServer.
 - Running against untrusted repositories still executes project tests/builds locally. Use an isolated environment for high-risk repositories.
@@ -524,11 +545,12 @@ Verified locally:
 - Backend modules compile
 - Database round trips work in temp SQLite files
 - Mocked agent/orchestrator flows work
+- OpenAI-compatible adapter passes its offline check (`backend/test_openai_compat.py`)
 - Frontend lint passes
 - Frontend production build passes
 
 Not yet verified end-to-end against a real GitHub issue in this workspace:
 
 - Real repository clone
-- Real Gemini function-calling loop
+- Real function-calling loop against Gemini or an OpenAI-compatible provider
 - Real Go test/vet/build execution on a target project
